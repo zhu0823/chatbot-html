@@ -1,0 +1,16 @@
+.segmented-control {
+    display: flex;
+    border: 1px solid #ccc;
+}
+
+.segment {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.segment.active {
+    background-color: #007bff;
+    color: white;
+}

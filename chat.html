@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>Chat Page</title>
+	<link rel="stylesheet" href="switch.css">
+	<link rel="stylesheet" href="segment.css">
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			background-color: #f2f2f2;
+			padding: 20px;
+			display: flex;
+			flex-direction: column;
+			min-height: 90vh;
+		}
+		h1 {
+			text-align: center;
+			margin-bottom: 20px;
+		}
+		.container {
+			background-color: #fff;
+			padding: 20px;
+			border-radius: 10px;
+			box-shadow: 0 0 10px 2px rgba(0,0,0,0.1);
+			flex: 1;
+			overflow-y: auto;
+			scroll-behavior: smooth;
+		}
+		.message {
+			display: flex;
+			flex-direction: column;
+			margin-bottom: 10px;
+		}
+		.message .meta {
+			font-size: 12px;
+			color: #999;
+			margin-bottom: 5px;
+		}
+		.message .content {
+			font-size: 16px;
+			padding: 10px;
+			border-radius: 5px;
+			background-color: #eee;
+			max-width: 70%;
+			align-self: flex-start;
+		}
+		.message .content.me {
+			background-color: #007bff;
+			color: #fff;
+			align-self: flex-end;
+		}
+		form {
+			display: flex;
+			margin-top: 20px;
+		}
+		input[type="text"] {
+			flex: 1;
+			padding: 10px;
+			border-radius: 5px;
+			border: none;
+			box-shadow: 0 0 10px 2px rgba(0,0,0,0.1);
+			margin-right: 10px;
+		}
+		button[type="submit"] {
+			padding: 10px;
+			border-radius: 5px;
+			border: none;
+			background-color: #007bff;
+			color: #fff;
+			box-shadow: 0 0 10px 2px rgba(0,0,0,0.1);
+			cursor: pointer;
+		}
+	</style>
+</head>
+<body>
+	<h1>Chat Room</h1>
+	<label class="switch" style="display: none">
+		<input type="checkbox">
+		<span class="slider"></span>
+	</label>
+	<div class="segmented-control">
+		<div class="segment active">问答模式</div>
+		<div class="segment">会话模式</div>
+	</div>
+	<br>
+	<div class="container" id="message-container">
+	</div>
+	<form>
+		<input type="text" placeholder="Type your message here..." id="message-input">
+		<button type="submit" id="send-button">Send</button>
+	</form>
+	<script>
+		// 将API URL替换为实际的API地址
+		const API_URL = '/api/chats';
+		// 消息模式 0:问答模式 1:会话模式
+		let chatType = 0;
+		// 获取消息容器和消息输入框
+		const messageContainer = document.getElementById('message-container');
+		const messageInput = document.getElementById('message-input');
+
+		// 定义消息数组
+		let messages = defaultMessages()
+
+		// 定义一个函数来将消息渲染到页面上
+		function renderMessages(messages) {
+			messageContainer.innerHTML = '';
+		
+			messages.forEach((message) => {
+				console.log('message:' + message.content);
+				if (message.role === 'system') {
+					return;
+				}
+				const div = document.createElement('div');
+				div.classList.add('message');
+				if (message.isMe) {
+					console.log("isMe");
+					div.innerHTML = `
+						<div class="meta">${message.timestamp} (${message.role})</div>
+						<div class="content me">${message.content}</div>
+					`;
+				} else {
+					div.innerHTML = `
+						<div class="meta">${message.timestamp} (${message.role})</div>
+						<div class="content">${message.content}</div>
+					`;
+				}
+				messageContainer.appendChild(div);
+			});
+		// 滚动到最新的消息
+		messageContainer.scrollTop = messageContainer.scrollHeight;
+		}
+
+		// 初始化页面时获取聊天消息
+		// getMessages();
+
+		// 定义一个函数来发送新的聊天消息
+		async function sendMessage() {
+			try {
+				const messageText = messageInput.value.trim();
+				if (!messageText) {
+					return;
+				}
+				if (chatType === 0) {
+					messages = defaultMessages()
+				}
+
+				// 发送成功后清空输入框
+				messageInput.value = '';
+				// 渲染发送的消息
+				renderMeMessage(messageText)
+
+				const body = []
+				messages.forEach((message) => {
+					body.push({
+						"role": message.role, "content": message.content
+					})
+				})
+				console.log(body)
+				const response = await fetch(API_URL, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ 'messages': body })
+				});
+
+				const result = await response.json();
+				if (result.status) {
+					// 获取最新的消息
+					// getMessages();
+					messages.push(result.data)
+					renderMessages(messages)
+
+				} else {
+					console.error(result.message);
+				}
+			} catch (error) {
+				console.error(error);
+			}
+		}
+
+		/// 渲染发送的消息
+		function renderMeMessage(messageText) {
+			const message = {
+				'role': 'user',
+				'content': messageText,
+				'timestamp': Date(),
+				'isMe': true
+			};
+			messages.push(message)
+			renderMessages(messages)
+		}
+
+		function defaultMessages() {
+			return [
+				{"role": "system", "content": "You are a helper assistant"}
+			];
+		}
+
+		// 在发送按钮被点击时发送新的聊天消息
+		const sendButton = document.getElementById('send-button');
+		sendButton.addEventListener('click', (event) => {
+			event.preventDefault();
+			sendMessage();
+		});
+
+		// 在输入框中按回车键时发送新的聊天消息
+		messageInput.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				sendMessage();
+			}
+		});
+
+		// segment控件
+		const segments = document.querySelectorAll('.segment');
+		// 切换聊天模式
+		segments.forEach((segment, index) => {
+			segment.addEventListener('click', () => {
+				chatType = index
+				segments.forEach(s => s.classList.remove('active'));
+				segment.classList.add('active');
+			});
+		});
+	</script>
+</body>
+</html>
